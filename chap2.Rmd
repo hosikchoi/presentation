@@ -1,0 +1,200 @@
+---
+title: "Neural Net"
+author: "Hosik Choi"
+date: '2019년 6월 25일'
+output: html_document
+---
+
+# 2-1. **iris** 자료 분류 
+
+```{r eval=FALSE}
+library(ggplot2); library(GGally)
+data(iris)
+pairs(iris[1:4], 
+      main = "Iris, 3 species",
+      pch = 21, bg = c(1, 2, 3)[unclass(iris$Species)])
+
+ggpairs(iris, columns=1:4, aes(color=Species)) + 
+ggtitle("Iris, 3 species")
+```
+
+
+## 자료준비
+
+```{r eval=FALSE}
+library(keras)
+iris2 <- iris
+iris[,5] <- as.numeric(as.factor(unlist(iris[,5]))) - 1
+iris <- as.matrix(iris)
+dimnames(iris) <- NULL
+iris_x <- normalize(iris[,1:4])
+
+# 훈련표본과 검증표본
+set.seed(369)
+ind <- sample(2, nrow(iris_x), replace=TRUE, prob=c(0.67, 0.33))
+tr_iris <- iris_x[ind==1, ]
+te_iris <- iris_x[ind==2, ]
+
+# 모형 예측변수
+tr_targets <- iris[ind==1, 5]
+te_targets <- iris[ind==2, 5]
+
+to_one_hot <- function(labels, dimension = 3) {
+  results <- matrix(0, length(labels), dimension)
+  ulevels <- unique(labels)
+  for(j in 1:length(ulevels))
+    results[labels==ulevels[j], j] <- 1
+  results
+}
+one_hot_labels <- to_one_hot(iris2$Species)
+
+# One-Hot 인코딩: 훈련예측변수/ 검증예측변수
+tr_labels <- to_categorical(tr_targets)
+te_labels <- to_categorical(te_targets)
+```
+
+## 모형 개발
+
+```{r eval=FALSE}
+
+# 초기화
+model <- keras_model_sequential()
+
+# 망 구축
+# 4 inputs -[8 hidden nodes] -3 outputs
+g1 <- model %>% 
+    layer_dense(units = 8, activation = 'relu', input_shape = c(4)) %>% 
+    layer_dense(units = 3, activation = 'softmax')
+
+summary(g1)
+```
+
+## 망 컴파일
+
+```{r eval=FALSE}
+g1 %>% compile(
+    loss = 'categorical_crossentropy',
+    optimizer = 'adam', metrics = 'accuracy')
+    
+history1 <- g1 %>% fit(
+    tr_iris, tr_labels, 
+    epochs = 200, batch_size = 5, validation_split = 0.1)
+
+listviewer::jsonedit(history1, model="view")
+```
+
+## 모형 수렴
+
+```{r eval=FALSE}
+plot(history1$metrics$loss, main="Model Loss", 
+  xlab = "epoch", ylab="loss", type="l")
+lines(history1$metrics$val_loss, col=2, lty=2)
+legend("topright", c("train","test"), col=c(1, 2), lty=c(1,2))
+```
+
+## 모형 정확성
+
+```{r eval=FALSE}
+plot(history1$metrics$acc, main="Model Accuracy", 
+  xlab="epoch", ylab="accuracy", type="l", ylim=c(0,1))
+lines(history1$metrics$val_acc, col=2, lty=2)
+legend("bottomright", c("train","test"), col=c(1,2), lty=c(1,2))
+```
+
+## 검증표본을 통한 평가
+
+```{r eval=FALSE}
+pred_mat <- g1 %>% predict(te_iris)
+pred <- apply(pred_mat,1,which.max)
+
+# 오차 행렬(Confusion Matrix)
+table(te_targets, pred)
+```
+
+## 연습
+
+```{r eval=FALSE}
+# 2번 모형
+g2 <- model %>% 
+    layer_dense(units = 8, activation = 'relu', input_shape = c(4)) %>% 
+    layer_dropout(rate = 0.5) %>% 
+    layer_dense(units = 3, activation = 'softmax')
+
+summary(g2)
+
+g2 %>% compile(
+    loss = 'categorical_crossentropy',
+    optimizer = 'adam', metrics = 'accuracy')
+
+history2 <- g2 %>% fit(
+    tr_iris, tr_labels, 
+    epochs = 500, batch_size = 5, validation_split = 0.1)
+
+listviewer::jsonedit(history2, model="view")
+```
+
+
+# 2-2. IMDB 자료 분류 
+
++ IMDB 자료에 대하여  
++ 가중치 벌점화(penalization) 또는 정칙화(regularization)와 
++ 드랍아웃(drop-out)을 적용하여 보자.
+
+## 정칙화 
+```{r eval=FALSE}
+library(keras)
+c(c(tr_data, tr_labels), c(te_data, te_labels)) %<-% imdb
+vectorize_sequence <- function(seqs, dims=1e4){
+  results <- matrix(0, nrow=length(seqs), ncol=dims)
+  for(i in 1:length(seqs)){
+    # 특정 index들을 1로 설정 
+    results[i, seqs[[i]]] <- 1
+  }
+  return(results)
+}
+x_tr <- vectorize_sequence(tr_data)
+x_te <- vectorize_sequence(te_data)
+
+y_tr <- as.numeric(tr_labels)
+y_te <- as.numeric(te_labels)
+val_idx <- 1:1e4
+x_val <- x_tr[val_idx,]
+partial_x_tr <- x_tr[-val_idx,]
+y_val <- y_tr[val_idx]
+partial_y_tr <- y_tr[-val_idx]
+
+model <- keras_model_sequential() %>%
+  layer_dense(units=16, kernel_regularizer = regularizer_l2(0.001),
+              activation="relu", input_shape=c(10000)) %>%
+  layer_dense(units=16, kernel_regularizer = regularizer_l2(0.001),
+              activation="relu", input_shape=c(10000)) %>%
+  layer_dense(units=1, activation="sigmoid")
+
+model %>% compile(
+  optimizer="rmsprop",
+  loss="binary_crossentropy",
+  metrics=c("accuracy"))
+
+history <- model %>% fit(
+  partial_x_tr, partial_y_tr,
+  epochs=20, batch_size=512,
+  validation_data=list(x_val, y_val))
+str(history)
+                
+plot(history)
+
+history_df <- as.data.frame(history)
+str(history_df)
+```
+
+## dropout
+
+```{r eval=FALSE}
+model <- keras_model_sequential() %>%
+  layer_dense(units=16, activation="relu", input_shape=c(10000)) %>%
+  layer_dropout(rate=0.5) %>%
+  layer_dense(units=16, activation="relu", input_shape=c(10000)) %>%
+  layer_dropout(rate=0.5) %>%
+  layer_dense(units=1, activation="sigmoid")
+```
+

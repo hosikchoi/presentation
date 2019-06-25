@@ -1,0 +1,97 @@
+---
+title: "CNN"
+author: "Hosik Choi"
+date: '2019년 6월 25일'
+output: html_document
+---
+
+# 3-1. **MNIST** 자료 
+
+## 자료준비
+
+```{r eval=FALSE}
+mnist <- dataset_mnist() 
+c(c(train_images, train_labels), c(test_images, test_labels)) %<-% mnist 
+test_labels_c <- test_labels
+train_images <- array_reshape(train_images, c(60000, 28, 28, 1)) 
+train_images <- train_images / 255 
+  
+test_images <- array_reshape(test_images, c(10000, 28, 28, 1)) 
+test_images <- test_images / 255 
+  
+train_labels <- to_categorical(train_labels) 
+test_labels <- to_categorical(test_labels) 
+```
+
+## 모형 개발
+
+```{r eval=FALSE}
+# 망 구축
+library(keras) 
+model <- keras_model_sequential() %>%  
+  layer_conv_2d(filters=32, kernel_size=c(3, 3), activation="relu", 
+                input_shape=c(28, 28, 1)) %>%  
+  layer_max_pooling_2d(pool_size=c(2, 2)) %>%  
+  layer_conv_2d(filters=64, kernel_size=c(3, 3), activation="relu") %>%
+  layer_max_pooling_2d(pool_size=c(2, 2)) %>%  
+  layer_conv_2d(filters=64, kernel_size=c(3, 3), activation="relu") 
+model
+ 
+summary(model)
+ 
+# 출력 3D 텐서  `(3, 3, 64)`를 1D 조밀 층에 연결함. 
+ 
+model <- model %>%  
+   layer_flatten() %>%  
+   layer_dense(units = 64, activation = "relu") %>%  
+   layer_dense(units = 10, activation = "softmax") 
+
+summary(model)
+```
+
+## 망 컴파일
+
+```{r eval=FALSE}
+model %>% compile( 
+   optimizer = "rmsprop", 
+   loss = "categorical_crossentropy", 
+   metrics = c("accuracy")) 
+
+history <- model %>% fit(
+   train_images, train_labels,  
+   epochs = 5, batch_size=64, validation_split = 0.1)
+
+# 평가
+results <- model %>% evaluate(test_images, test_labels) 
+listviewer::jsonedit(history, model="view")
+```
+
+## 모형 수렴
+
+```{r eval=FALSE}
+plot(history$metrics$loss, main="Model Loss", 
+  xlab = "epoch", ylab="loss", type="l")
+lines(history$metrics$val_loss, col=2, lty=2)
+legend("topright", c("train","test"), col=c(1, 2), lty=c(1,2))
+```
+
+## 모형 정확성
+
+```{r eval=FALSE}
+plot(history$metrics$acc, main="Model Accuracy", 
+  xlab="epoch", ylab="accuracy", type="l", ylim=c(0.8,1))
+lines(history$metrics$val_acc, col=2, lty=2)
+legend("bottomright", c("train","test"), col=c(1,2), lty=c(1,2))
+```
+
+## 검증표본을 통한 평가
+
+```{r eval=FALSE}
+pred_mat <- model %>% predict(test_images)
+pred <- apply(pred_mat,1,which.max)
+
+# 오차 행렬(Confusion Matrix)
+table(test_labels_c, pred)
+```
+
+

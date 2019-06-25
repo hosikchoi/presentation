@@ -1,0 +1,148 @@
+---
+title: "RNN"
+author: "Hosik Choi"
+date: '2019년 6월 25일'
+output: html_document
+---
+
+# 4-1. **IMDB** 자료에 대한 embedding layer 적용
+
++ IMDB 리뷰데이터를 통해 긍정/부정 이진분류 문제에 대하여
++ 단어를 저차원의 실수벡터로 임베딩(embedding layer, 차원축소)하여 분류에 적용하여 보자
+
+## IMDB 데이터 자료 준비
+
+```{r eval=FALSE}
+library(keras)
+max_features <- 10000 # 문서당 1000 단어로 제한 
+maxlen <- 20 # 한 문서당 20개 단어로 감상평 추출 
+
+# 자료
+imdb <- dataset_imdb(num_words = max_features)
+c(c(x_train, y_train), c(x_test, y_test)) %<-% imdb
+
+# 2D 정수값을 가지는 행렬 텐서, shape: (표본, maxlen)
+x_train <-  pad_sequences(x_train, maxlen = maxlen)
+x_test <-  pad_sequences(x_test, maxlen = maxlen)
+head(x_train)
+```
+
+
+## 망 구축, 적합
+
++ 각 감상평에서 20개의 단어만 봄
+
+```{r eval=FALSE}
+model <- keras_model_sequential() %>% 
+  # 임베딩 층: 10000 -> 8
+  # shape: (표본, maxlen, 8)
+  layer_embedding(input_dim = 10000, output_dim = 8, 
+                  input_length = maxlen) %>% 
+  # 임베딩 3D 텐서를 2D 텐서 (표본, maxlen * 8)로 만듦
+  layer_flatten() %>% 
+  layer_dense(units=1, activation="sigmoid")  # 최상층 분류로 시그모이드 추가 
+  
+model %>% compile(
+  optimizer = "rmsprop",
+  loss = "binary_crossentropy",
+  metrics = c("acc")
+)
+
+history <- model %>% fit( x_train, y_train,
+  epochs = 10, batch_size = 32,  validation_split = 0.2
+)
+
+plot(history)
+```
+
+
+# 4-2. **IMDB** 자료에 대한 RNN 망 적용  
+
++ IMDB 리뷰데이터를 통해 긍정/부정 이진분류 문제에 대하여  
++ 임베딩한후 RNN으로 학습하고 이를 활용하여 분류하여 본다.
+
+## 자료준비
+
+```{r eval=FALSE}
+library(keras)
+max_features <- 10000 ; maxlen <- 500  
+batch_size <- 32
+
+imdb <- dataset_imdb(num_words = max_features)
+c(c(input_train, y_train), c(input_test, y_test)) %<-% imdb 
+cat(length(input_train), "train sequences\n") #25000 train sequences
+cat(length(input_test), "test sequences\n")  #25000 test sequences
+cat("Pad sequences (samples x time)\n")
+
+input_train <- pad_sequences(input_train, maxlen = maxlen) # 25000 500 
+input_test <- pad_sequences(input_test, maxlen = maxlen) # 25000 500 
+cat("input_train shape:", dim(input_train), "\n")
+cat("input_test shape:", dim(input_test), "\n")
+```
+
+
+## 망 구성
+
+```{r eval=FALSE}
+model <- keras_model_sequential() %>%
+  layer_embedding(input_dim = max_features, output_dim = 32) %>%
+  layer_simple_rnn(units = 32) %>%
+  layer_dense(units = 1, activation = "sigmoid")
+summary(model)  
+```
+
+## 망 적합, 평가
+  
+```{r eval=FALSE}
+model %>% compile(
+  optimizer = "rmsprop",
+  loss = "binary_crossentropy",
+  metrics = c("acc")
+)
+
+history <- model %>% fit(
+  input_train, y_train,
+  epochs = 10,
+  batch_size = 128,
+  validation_split = 0.2
+)
+plot(history)
+```
+
+
+# 4-3. **IMDB** 자료에 대한 LSTM 망 적용 
+
++ IMDB 리뷰데이터를 통해 긍정/부정 이진분류 문제에 대하여
++ 임베딩한후 RNN의 \tcb{LSTM} 망으로 학습하고 이를 활용하여 분류하여 본다.
+
+## LSTM 망 구성
+
+```{r eval=FALSE}
+model <- keras_model_sequential() %>% 
+  layer_embedding(input_dim = max_features, output_dim = 32) %>% 
+  layer_lstm(units = 32) %>% 
+  layer_dense(units = 1, activation = "sigmoid")
+```
+
+## 망 적합, 평가
+
+```{r eval=FALSE}
+model %>% compile(
+  optimizer = "rmsprop", 
+  loss = "binary_crossentropy", 
+  metrics = c("acc")
+)
+
+history <- model %>% fit(
+  input_train, y_train,
+  epochs = 10,
+  batch_size = 128,
+  validation_split = 0.2
+)
+
+plot(history)
+```
+
+
+
+
