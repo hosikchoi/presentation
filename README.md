@@ -43,22 +43,32 @@ python 3.7 version
 # XOR 분류(입력2개) 예제
 Rstudio에서 다음을 입력
 >library(neuralnet)
+
 >AND <- c(rep(0,3),1)
+
 >OR <- c(0,rep(1,3))
 
 >xx <- matrix(0,4,2)
+
 >xx[,1] <- c(0,0,1,1)
+
 >xx[,2] <- c(0,1,0,1)
 
 # 1.
 >binary.data <- data.frame(xx, AND, OR)
+
 >colnames(binary.data) <- c("Var1", "Var2")
+
 >print(net <- neuralnet(AND+OR~Var1+Var2, binary.data, hidden=0, rep=10,err.fct="ce", linear.output=FALSE))
+
 >plot(net)
 
 # 2.
 >XOR <- c(0,1,1,0)
+
 >xor.data <- data.frame(expand.grid(c(0,1), c(0,1)), XOR)
+
 >print(net.xor <- neuralnet(XOR~Var1+Var2, xor.data, hidden=2, rep=5))
+
 >plot(net.xor, rep="best")
 
