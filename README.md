@@ -11,6 +11,7 @@ RTools는 https://cran.r-project.org/bin/windows/Rtools/Rtools34.exe 에서 3.4�
 
 2. Rstudio에서 다음을 입력
 >install.packages('devtools')
+
 >devtools::install_github("rstudio/keras")
 
 3. Anaconda를 설치
