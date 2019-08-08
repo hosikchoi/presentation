@@ -1,0 +1,2 @@
+나이브베이즈 모형
+https://datascienceschool.net/view-notebook/c19b48e3c7b048668f2bb0a113bd25f7/
